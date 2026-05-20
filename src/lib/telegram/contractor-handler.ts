@@ -56,39 +56,25 @@ interface ContractorBotStateData {
  * Вызывается асинхронно — не выбрасывает ошибки наружу.
  */
 export async function handleContractorUpdate(update: TelegramUpdate): Promise<void> {
-  console.log('[contractor-handler] start, update keys=', Object.keys(update).join(','))
-
   const callbackQuery = update.callback_query
   const message = update.message
-
-  const updateType = callbackQuery ? 'callback_query' : message ? 'message' : 'unknown'
-  const chatId = callbackQuery?.message?.chat.id ?? callbackQuery?.from.id ?? message?.chat.id
-  console.log('[contractor-handler] type=', updateType, 'chatId=', chatId)
-
-  if (message?.text) {
-    console.log('[contractor-handler] text=', message.text.slice(0, 80))
-  }
 
   const supabase = createServiceRoleClient()
 
   // ── Обработка inline кнопок ──
   if (callbackQuery) {
-    console.log('[contractor-handler] handling callback, data=', callbackQuery.data)
     const cbChatId = callbackQuery.message?.chat.id ?? callbackQuery.from.id
     await handleContractorCallback(supabase, cbChatId, callbackQuery.id, callbackQuery.data ?? '')
     return
   }
 
   // ── Обработка входящих фото (завершение заявки) ──
+  // Текстовые сообщения и /start игнорируются — contractor-бот работает
+  // только через inline-кнопки в канале и фото для завершения заявки.
   if (message?.photo && message.photo.length > 0) {
-    console.log('[contractor-handler] handling photo, count=', message.photo.length)
     await handleCompletionPhoto(supabase, message.chat.id, message)
     return
   }
-
-  // Текстовые сообщения и /start не обрабатываются contractor-ботом —
-  // он работает только через inline-кнопки и фото в канале.
-  console.log('[contractor-handler] EARLY RETURN: no callback_query and no photo (text/start ignored by design)')
 }
 
 // ---------------------------------------------------------------------------

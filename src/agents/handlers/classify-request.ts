@@ -116,7 +116,6 @@ export async function classifyRequest(
       confidence: 0.9,
       reasoning: `[MOCK] Keyword-based fallback, no valid ANTHROPIC_API_KEY. Matched: ${category}`,
     }
-    console.log('[classify-request] MOCK mode — skipping Claude, category=', category)
     return { success: true, result }
   }
 

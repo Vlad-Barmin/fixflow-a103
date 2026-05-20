@@ -51,10 +51,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Верификация секрета — первым делом
   const secret = req.nextUrl.searchParams.get('secret')
   if (secret !== process.env.TELEGRAM_CONTRACTOR_BOT_SECRET) {
-    console.warn('[contractor-route] secret FAILED, got:', secret?.slice(0, 6) ?? 'null')
     return NextResponse.json({ ok: false }, { status: 403 })
   }
-  console.log('[contractor-route] secret OK')
 
   // 2. Парсинг тела
   let update: TelegramUpdate
@@ -64,18 +62,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[contractor-route] JSON parse FAILED:', err)
     return NextResponse.json({ ok: true })
   }
-  console.log('[contractor-route] JSON parsed, update_id=', update.update_id)
 
   // 3. Rate limiting по chat_id
   const chatId = extractChatId(update)
   if (chatId !== null && isRateLimited(chatId)) {
-    console.warn('[contractor-route] rate limit HIT for chatId=', chatId)
     return NextResponse.json({ ok: true })
   }
-  console.log('[contractor-route] rate limit passed, chatId=', chatId)
 
   // 4. Обработка — await, чтобы не убивалась при заморозке serverless
-  console.log('[contractor-route] calling handler')
   try {
     await handleContractorUpdate(update)
   } catch (err) {

@@ -82,27 +82,13 @@ const CONSENT_TEXT =
  * Вызывается асинхронно — не выбрасывает ошибки наружу.
  */
 export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
-  console.log('[owner-handler] start, update keys=', Object.keys(update).join(','))
-
   const message = update.message
   const callbackQuery = update.callback_query
 
   const chatId =
     message?.chat.id ?? callbackQuery?.message?.chat.id ?? callbackQuery?.from.id
 
-  console.log('[owner-handler] chatId=', chatId)
-
-  if (!chatId) {
-    console.log('[owner-handler] EARLY RETURN: chatId is null/undefined')
-    return
-  }
-
-  const updateType = message ? 'message' : callbackQuery ? 'callback_query' : 'unknown'
-  console.log('[owner-handler] type=', updateType)
-
-  if (message?.text) {
-    console.log('[owner-handler] text=', message.text.slice(0, 80))
-  }
+  if (!chatId) return
 
   const supabase = createServiceRoleClient()
 
@@ -122,11 +108,9 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
 
   const currentState = (stateRow?.state ?? null) as BotState | null
   const stateData = (stateRow?.data ?? {}) as RegistrationData
-  console.log('[owner-handler] currentState=', currentState)
 
   // Команда /start всегда сбрасывает к началу регистрации
   if (message?.text === '/start' || currentState === null) {
-    console.log('[owner-handler] sending consent message')
     await upsertState(supabase, chatId, 'awaiting_consent', {})
     await sendConsentMessage(chatId)
     return
@@ -134,7 +118,6 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
 
   // Обработка callback_query (кнопки inline keyboard)
   if (callbackQuery) {
-    console.log('[owner-handler] handling callback, data=', callbackQuery.data)
     await handleCallbackQuery(
       supabase,
       chatId,
@@ -148,12 +131,9 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
 
   // Обработка текстовых сообщений
   if (message) {
-    console.log('[owner-handler] handling text message, state=', currentState)
     await handleTextMessage(supabase, chatId, message.text ?? '', currentState, stateData)
     return
   }
-
-  console.log('[owner-handler] EARLY RETURN: no message and no callback_query')
 }
 
 // ---------------------------------------------------------------------------

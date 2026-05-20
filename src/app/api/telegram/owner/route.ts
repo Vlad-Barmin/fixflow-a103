@@ -49,10 +49,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Верификация секрета — первым делом
   const secret = req.nextUrl.searchParams.get('secret')
   if (secret !== process.env.TELEGRAM_BOT_SECRET) {
-    console.warn('[owner-route] secret FAILED, got:', secret?.slice(0, 6) ?? 'null')
     return NextResponse.json({ ok: false }, { status: 403 })
   }
-  console.log('[owner-route] secret OK')
 
   // 2. Парсинг тела
   let update: TelegramUpdate
@@ -62,18 +60,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[owner-route] JSON parse FAILED:', err)
     return NextResponse.json({ ok: true })
   }
-  console.log('[owner-route] JSON parsed, update_id=', update.update_id)
 
   // 3. Rate limiting по chat_id
   const chatId = extractChatId(update)
   if (chatId !== null && isRateLimited(chatId)) {
-    console.warn('[owner-route] rate limit HIT for chatId=', chatId)
     return NextResponse.json({ ok: true })
   }
-  console.log('[owner-route] rate limit passed, chatId=', chatId)
 
   // 4. Обработка — await, чтобы не убивалась при заморозке serverless
-  console.log('[owner-route] calling handler')
   try {
     await handleOwnerUpdate(update)
   } catch (err) {
