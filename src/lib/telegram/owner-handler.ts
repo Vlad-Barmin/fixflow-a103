@@ -481,10 +481,13 @@ async function handleNewRequest(
       'Вы получите уведомление об изменении статуса.'
   )
 
-  // Запустить AI-классификацию асинхронно (не блокируем ответ владельцу)
-  triggerAiClassification(supabase, request.id, apartment).catch((err) => {
+  // AI-классификация синхронно — Vercel serverless убивает fire-and-forget
+  // после отправки HTTP-ответа, поэтому await обязателен
+  try {
+    await triggerAiClassification(supabase, request.id, apartment)
+  } catch (err) {
     console.error('AI classification error for request', request.id, err)
-  })
+  }
 }
 
 // ---------------------------------------------------------------------------
