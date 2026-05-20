@@ -94,10 +94,10 @@ function keywordClassify(description: string): ClassificationResult['category'] 
 }
 
 function isApiKeyPlaceholder(): boolean {
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key) return true
-  // Настоящие ключи Anthropic начинаются с 'sk-ant-'
-  if (!key.startsWith('sk-ant-')) return true
+  // Явный выключатель — USE_MOCK_CLASSIFIER=true в Vercel env vars
+  if (process.env.USE_MOCK_CLASSIFIER === 'true') return true
+  // Запасная проверка: ключ не задан
+  if (!process.env.ANTHROPIC_API_KEY) return true
   return false
 }
 
