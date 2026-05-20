@@ -69,9 +69,57 @@ function detectImageMediaType(base64: string): ImageMediaType {
  *
  * Никогда не выбрасывает наверх — это часть контракта graceful degradation.
  */
+// ---------------------------------------------------------------------------
+// Keyword-based fallback classifier (no API key needed)
+// TODO: удалить этот блок когда будет настоящий ANTHROPIC_API_KEY
+// ---------------------------------------------------------------------------
+
+type KeywordRule = { patterns: RegExp; category: ClassificationResult['category'] }
+
+const KEYWORD_RULES: KeywordRule[] = [
+  { patterns: /кран|вода|течёт|течет|протечк|сантехник|труб|унитаз|ванн|душ|водопровод/i, category: 'plumbing' },
+  { patterns: /розетк|провод|свет|лампоч|щиток|автомат|электр|выключател|обесточ/i, category: 'electrical' },
+  { patterns: /батаре|радиатор|тепло|отоплен|холодно|вентил|кондиц|hvac/i, category: 'hvac' },
+  { patterns: /трещин|стен|потолок|пол|плит|фундамент|несущ|конструк/i, category: 'structural' },
+  { patterns: /окн|дверь|дверей|петл|замок|ручк|стекло|раму|раме|балкон/i, category: 'windows_doors' },
+  { patterns: /штукатурк|краск|обои|плитк|отделк|ламинат|паркет|полов/i, category: 'finishing' },
+  { patterns: /плит|холодильник|стиральн|посудомо|духовк|бытов|техник|прибор/i, category: 'appliances' },
+]
+
+function keywordClassify(description: string): ClassificationResult['category'] {
+  for (const rule of KEYWORD_RULES) {
+    if (rule.patterns.test(description)) return rule.category
+  }
+  return 'other'
+}
+
+function isApiKeyPlaceholder(): boolean {
+  const key = process.env.ANTHROPIC_API_KEY
+  if (!key) return true
+  // Настоящие ключи Anthropic начинаются с 'sk-ant-'
+  if (!key.startsWith('sk-ant-')) return true
+  return false
+}
+
 export async function classifyRequest(
   input: ClassificationInput
 ): Promise<ClassificationOutput> {
+  // -------------------------------------------------------------------------
+  // 0. Обход AI: если ключ отсутствует или заглушка — keyword-классификация
+  // TODO: убрать этот блок после настройки настоящего ANTHROPIC_API_KEY
+  // -------------------------------------------------------------------------
+  if (isApiKeyPlaceholder()) {
+    const category = keywordClassify(input.description)
+    const result: ClassificationResult = {
+      category,
+      priority: 'normal',
+      confidence: 0.9,
+      reasoning: `[MOCK] Keyword-based fallback, no valid ANTHROPIC_API_KEY. Matched: ${category}`,
+    }
+    console.log('[classify-request] MOCK mode — skipping Claude, category=', category)
+    return { success: true, result }
+  }
+
   const supabase = createServiceRoleClient()
 
   // -------------------------------------------------------------------------
