@@ -72,12 +72,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   console.log('[owner-route] rate limit passed, chatId=', chatId)
 
-  // 4. Обработка в background (не await)
+  // 4. Обработка — await, чтобы не убивалась при заморозке serverless
   console.log('[owner-route] calling handler')
-  handleOwnerUpdate(update).catch((err) => {
-    console.error('[owner webhook] unhandled error:', err)
-  })
+  try {
+    await handleOwnerUpdate(update)
+  } catch (err) {
+    console.error('[owner webhook] handler error:', err)
+  }
 
-  // 5. Немедленный ответ Telegram
   return NextResponse.json({ ok: true })
 }

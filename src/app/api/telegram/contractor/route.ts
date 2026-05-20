@@ -70,11 +70,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true })
   }
 
-  // 4. Обработка в background (не await)
-  handleContractorUpdate(update).catch((err) => {
-    console.error('[contractor webhook] unhandled error:', err)
-  })
+  // 4. Обработка — await, чтобы не убивалась при заморозке serverless
+  try {
+    await handleContractorUpdate(update)
+  } catch (err) {
+    console.error('[contractor webhook] handler error:', err)
+  }
 
-  // 5. Немедленный ответ Telegram
   return NextResponse.json({ ok: true })
 }
