@@ -96,7 +96,7 @@ export function ComplexesClient({ initialComplexes }: ComplexesClientProps) {
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex justify-end">
         <Button onClick={openAdd}>
           <Plus className="h-4 w-4" />
           Добавить ЖК
@@ -104,16 +104,16 @@ export function ComplexesClient({ initialComplexes }: ComplexesClientProps) {
       </div>
 
       {complexes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400 rounded-lg border border-dashed border-gray-200 bg-white">
-          <Building2 className="h-12 w-12 mb-3 text-gray-300" />
-          <p className="text-base font-medium text-gray-500">Комплексов нет</p>
-          <p className="text-sm mt-1">Добавьте первый жилой комплекс</p>
+        <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-zinc-200 bg-white">
+          <Building2 className="h-12 w-12 mb-3 text-zinc-300" />
+          <p className="text-base font-medium text-zinc-500">Комплексов нет</p>
+          <p className="text-sm mt-1 text-zinc-400">Добавьте первый жилой комплекс</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-zinc-50/60">
                 <TableHead>Название</TableHead>
                 <TableHead>Адрес</TableHead>
                 <TableHead>Квартир</TableHead>
@@ -123,9 +123,9 @@ export function ComplexesClient({ initialComplexes }: ComplexesClientProps) {
             <TableBody>
               {complexes.map((complex) => (
                 <TableRow key={complex.id}>
-                  <TableCell className="font-medium text-gray-900">{complex.name}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{complex.address}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{complex.apartment_count}</TableCell>
+                  <TableCell className="font-medium text-zinc-900">{complex.name}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{complex.address}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{complex.apartment_count}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"

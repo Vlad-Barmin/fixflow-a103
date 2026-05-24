@@ -14,10 +14,10 @@ export default async function ContractorsPage() {
   const contractors = await getContractors()
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Подрядчики</h1>
-        <p className="text-sm text-gray-500 mt-1">Управление исполнителями</p>
+        <h1 className="text-xl font-bold text-zinc-900">Подрядчики</h1>
+        <p className="text-sm text-zinc-500 mt-1">Управление исполнителями</p>
       </div>
       <ContractorsClient initialContractors={contractors} />
     </div>

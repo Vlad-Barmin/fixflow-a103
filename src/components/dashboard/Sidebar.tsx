@@ -40,16 +40,20 @@ export function Sidebar({ userEmail }: SidebarProps) {
     router.refresh()
   }
 
+  const initials = userEmail
+    ? userEmail[0].toUpperCase()
+    : 'М'
+
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-white border-r border-gray-200">
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-sm">
+    <aside className="flex flex-col w-64 min-h-screen bg-white shadow-[1px_0_0_0_#e4e4e7]">
+      <div className="flex items-center gap-3 px-6 py-5">
+        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-[#D91C1C] text-white font-bold text-sm shrink-0">
           F
         </div>
-        <span className="font-semibold text-gray-900">FixFlow A103</span>
+        <span className="font-semibold text-zinc-900">FixFlow A103</span>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-3 space-y-0.5">
         {navItems.map((item) => {
           const isActive = item.exact
             ? pathname === item.href
@@ -60,10 +64,10 @@ export function Sidebar({ userEmail }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150',
                 isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-[#FEF2F2] text-[#D91C1C]'
+                  : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900'
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -73,13 +77,16 @@ export function Sidebar({ userEmail }: SidebarProps) {
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-gray-200">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-xs text-gray-500 truncate">{userEmail ?? 'Менеджер'}</p>
+      <div className="px-3 py-4 border-t border-zinc-100">
+        <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-100 text-zinc-600 text-xs font-semibold shrink-0">
+            {initials}
+          </div>
+          <p className="text-xs text-zinc-500 truncate">{userEmail ?? 'Менеджер'}</p>
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-colors duration-150 cursor-pointer"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           Выйти

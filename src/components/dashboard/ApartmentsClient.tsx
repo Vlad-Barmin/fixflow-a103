@@ -139,7 +139,7 @@ export function ApartmentsClient({ initialApartments, complexes }: ApartmentsCli
 
   return (
     <>
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex items-center gap-3 flex-wrap">
         <Select
           value={complexFilter}
           onChange={(e) => setComplexFilter(e.target.value)}
@@ -160,18 +160,18 @@ export function ApartmentsClient({ initialApartments, complexes }: ApartmentsCli
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400 rounded-lg border border-dashed border-gray-200 bg-white">
-          <Home className="h-12 w-12 mb-3 text-gray-300" />
-          <p className="text-base font-medium text-gray-500">Квартир нет</p>
-          <p className="text-sm mt-1">
+        <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-zinc-200 bg-white">
+          <Home className="h-12 w-12 mb-3 text-zinc-300" />
+          <p className="text-base font-medium text-zinc-500">Квартир нет</p>
+          <p className="text-sm mt-1 text-zinc-400">
             {complexFilter ? 'В выбранном комплексе квартир нет' : 'Добавьте первую квартиру'}
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-zinc-50/60">
                 <TableHead>ЖК</TableHead>
                 <TableHead>Корпус</TableHead>
                 <TableHead>Квартира</TableHead>
@@ -184,14 +184,14 @@ export function ApartmentsClient({ initialApartments, complexes }: ApartmentsCli
             <TableBody>
               {filtered.map((apt) => (
                 <TableRow key={apt.id}>
-                  <TableCell className="text-sm text-gray-700">
+                  <TableCell className="text-sm text-zinc-600">
                     {apt.residential_complexes?.name ?? '—'}
                   </TableCell>
-                  <TableCell className="text-sm text-gray-700">{apt.building}</TableCell>
-                  <TableCell className="font-medium text-gray-900">{apt.number}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{apt.owner_name ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{apt.owner_phone ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-gray-600">
+                  <TableCell className="text-sm text-zinc-600">{apt.building}</TableCell>
+                  <TableCell className="font-medium text-zinc-900">{apt.number}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{apt.owner_name ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{apt.owner_phone ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">
                     {apt.warranty_expires_at
                       ? format(new Date(apt.warranty_expires_at), 'd MMM yyyy', { locale: ru })
                       : '—'}

@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { ComplexesClient } from '@/components/dashboard/ComplexesClient'
+import { Building2 } from 'lucide-react'
 import type { PostgrestError } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 
@@ -33,10 +34,13 @@ export default async function ComplexesPage() {
   const complexes = await getComplexes()
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Жилые комплексы</h1>
-        <p className="text-sm text-gray-500 mt-1">Реестр ЖК</p>
+        <div className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-zinc-400" />
+          <h1 className="text-xl font-bold text-zinc-900">Жилые комплексы</h1>
+        </div>
+        <p className="text-sm text-zinc-500 mt-1">Реестр ЖК</p>
       </div>
       <ComplexesClient initialComplexes={complexes} />
     </div>

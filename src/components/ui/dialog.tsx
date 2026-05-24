@@ -46,7 +46,7 @@ function DialogContent({ className, children, onClose, ...props }: DialogContent
   return (
     <div
       className={cn(
-        'relative z-50 w-full max-w-lg rounded-lg border border-gray-200 bg-white p-6 shadow-lg',
+        'relative z-50 w-full max-w-lg rounded-2xl border border-zinc-100 bg-white p-6 shadow-2xl',
         className
       )}
       {...props}
@@ -54,7 +54,7 @@ function DialogContent({ className, children, onClose, ...props }: DialogContent
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm text-gray-400 hover:text-gray-600"
+          className="absolute right-4 top-4 rounded-sm text-zinc-400 hover:text-zinc-600 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -72,7 +72,7 @@ function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 
 function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h2 className={cn('text-lg font-semibold text-gray-900', className)} {...props} />
+    <h2 className={cn('text-lg font-semibold text-zinc-900', className)} {...props} />
   )
 }
 

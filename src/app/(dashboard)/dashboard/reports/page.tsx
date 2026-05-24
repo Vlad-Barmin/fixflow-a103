@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -106,10 +108,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Отчёты</h1>
-        <p className="text-sm text-gray-500 mt-1">Статистика по подрядчикам за период</p>
+        <h1 className="text-xl font-bold text-zinc-900">Отчёты</h1>
+        <p className="text-sm text-zinc-500 mt-1">Статистика по подрядчикам за период</p>
       </div>
 
       <Card>
@@ -118,30 +120,26 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="date-from" className="text-sm text-gray-600">
-                С
-              </label>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="date-from">С</Label>
+              <Input
                 id="date-from"
                 type="date"
                 value={dateFrom}
                 max={dateTo}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-40"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="date-to" className="text-sm text-gray-600">
-                По
-              </label>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="date-to">По</Label>
+              <Input
                 id="date-to"
                 type="date"
                 value={dateTo}
                 min={dateFrom}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-40"
               />
             </div>
             <Button onClick={handleLoad} disabled={loading}>
@@ -159,7 +157,7 @@ export default function ReportsPage() {
       </Card>
 
       {error && (
-        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -167,7 +165,7 @@ export default function ReportsPage() {
       {loaded && rows.length === 0 && !loading && (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-gray-500 text-sm">
+            <p className="text-zinc-500 text-sm">
               За выбранный период данных нет. Измените диапазон дат и нажмите «Загрузить».
             </p>
           </CardContent>
@@ -179,30 +177,56 @@ export default function ReportsPage() {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-zinc-50/60">
                   <TableHead>Подрядчик</TableHead>
                   <TableHead className="text-right">Всего</TableHead>
                   <TableHead className="text-right">Выполнено</TableHead>
+                  <TableHead className="w-32">Выполнение</TableHead>
                   <TableHead className="text-right">В работе</TableHead>
                   <TableHead className="text-right">Просрочено</TableHead>
-                  <TableHead className="text-right">Среднее время (дни)</TableHead>
+                  <TableHead className="text-right">Ср. время (дни)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.contractor_id}>
-                    <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell className="text-right">{row.total}</TableCell>
-                    <TableCell className="text-right text-green-700">{row.completed}</TableCell>
-                    <TableCell className="text-right text-purple-700">{row.in_progress}</TableCell>
-                    <TableCell className="text-right text-red-700">{row.overdue}</TableCell>
-                    <TableCell className="text-right">
-                      {row.avg_completion_days !== null
-                        ? row.avg_completion_days.toFixed(1)
-                        : '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {rows.map((row) => {
+                  const pct = row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0
+                  return (
+                    <TableRow key={row.contractor_id}>
+                      <TableCell className="font-medium text-zinc-900">
+                        <span className="flex items-center gap-1.5">
+                          {row.overdue > 0 && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                          )}
+                          {row.name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-zinc-700">{row.total}</TableCell>
+                      <TableCell className="text-right text-green-700">{row.completed}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-zinc-200 rounded-full h-1.5">
+                            <div
+                              className="bg-[#D91C1C] h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-500 w-8 text-right tabular-nums">{pct}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-purple-700">{row.in_progress}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={row.overdue > 0 ? 'text-red-600 font-medium' : 'text-zinc-700'}>
+                          {row.overdue}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-zinc-600">
+                        {row.avg_completion_days !== null
+                          ? row.avg_completion_days.toFixed(1)
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>

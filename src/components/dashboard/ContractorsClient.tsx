@@ -143,7 +143,7 @@ export function ContractorsClient({ initialContractors }: ContractorsClientProps
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex justify-end">
         <Button onClick={openAdd}>
           <Plus className="h-4 w-4" />
           Добавить подрядчика
@@ -151,16 +151,16 @@ export function ContractorsClient({ initialContractors }: ContractorsClientProps
       </div>
 
       {contractors.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400 rounded-lg border border-dashed border-gray-200 bg-white">
-          <HardHat className="h-12 w-12 mb-3 text-gray-300" />
-          <p className="text-base font-medium text-gray-500">Подрядчиков нет</p>
-          <p className="text-sm mt-1">Добавьте первого подрядчика</p>
+        <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-zinc-200 bg-white">
+          <HardHat className="h-12 w-12 mb-3 text-zinc-300" />
+          <p className="text-base font-medium text-zinc-500">Подрядчиков нет</p>
+          <p className="text-sm mt-1 text-zinc-400">Добавьте первого подрядчика</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-zinc-50/60">
                 <TableHead>Имя</TableHead>
                 <TableHead>Telegram канал</TableHead>
                 <TableHead>Категории</TableHead>
@@ -172,8 +172,8 @@ export function ContractorsClient({ initialContractors }: ContractorsClientProps
             <TableBody>
               {contractors.map((contractor) => (
                 <TableRow key={contractor.id}>
-                  <TableCell className="font-medium text-gray-900">{contractor.name}</TableCell>
-                  <TableCell className="text-sm text-gray-500">
+                  <TableCell className="font-medium text-zinc-900">{contractor.name}</TableCell>
+                  <TableCell className="text-sm text-zinc-500">
                     {contractor.telegram_channel_id ?? '—'}
                   </TableCell>
                   <TableCell>
@@ -183,16 +183,16 @@ export function ContractorsClient({ initialContractors }: ContractorsClientProps
                           <CategoryBadge key={cat} category={cat as RequestCategory} />
                         ))
                       ) : (
-                        <span className="text-gray-400 text-xs">Не указаны</span>
+                        <span className="text-zinc-400 text-xs">Не указаны</span>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600">{contractor.phone ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-zinc-600">{contractor.phone ?? '—'}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       contractor.is_active
                         ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
+                        : 'bg-zinc-100 text-zinc-500'
                     }`}>
                       {contractor.is_active ? 'Активен' : 'Неактивен'}
                     </span>
@@ -269,8 +269,8 @@ export function ContractorsClient({ initialContractors }: ContractorsClientProps
                     onClick={() => toggleCategory(cat)}
                     className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
                       form.categories.includes(cat)
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        ? 'border-[#D91C1C] bg-red-50 text-[#D91C1C]'
+                        : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300'
                     }`}
                   >
                     <CategoryBadge category={cat} />
