@@ -417,7 +417,7 @@ CREATE TABLE IF NOT EXISTS public.request_status_history (
   old_status   text,
   new_status   text NOT NULL,
   changed_by   text,  -- 'manager' | 'contractor' | 'system' | 'ai'
-  comment      text,
+  reason       text,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
