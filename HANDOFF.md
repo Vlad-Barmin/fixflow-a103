@@ -23,11 +23,11 @@
 | 3 | Mock-классификатор не включался: заглушка начиналась с `sk-ant-` и проходила старую проверку | `src/agents/handlers/classify-request.ts` | Явный флаг `USE_MOCK_CLASSIFIER=true` вместо heuristic |
 | 4 | `is_manager()` в `LANGUAGE sql` падала при парсинге — `manager_profiles` ещё не существовала | `MIGRATIONS_ALL.sql` | Заменили на `LANGUAGE plpgsql` (отложенный парсинг) |
 | 5 | `//` комментарий в `vercel.json` ломал парсер | `vercel.json` | Убрали, заметку перенесли в `CRON_NOTES.md` |
+| 6 | Fire-and-forget в API-роутах создания/реклассификации заявок — Vercel замораживал функцию после HTTP-ответа до того, как результат AI-классификации успевал записаться в БД; заявки зависали в `ai_processing` (плавающий баг, терялось до 2 из 3 заявок) | `src/app/api/requests/route.ts`, `src/app/api/requests/[id]/reclassify/route.ts` | Заменили fire-and-forget на `after()` из `next/server` (коммит `e4e2066`) + добавили `markClassificationFailed()` — при сбое классификации заявка уходит в `requires_manual_review`, а не зависает молча |
 
 ### AI-классификатор
-- Код Claude Sonnet 4.5 через OpenRouter (`anthropic/claude-sonnet-4.5`) написан и задеплоен, но не активен
-- Активен keyword-fallback: регексп по ключевым словам → 8 категорий
-- Режим включается через `USE_MOCK_CLASSIFIER=true` в Vercel env vars
+- Активен реальный AI: Claude Sonnet 4.5 через OpenRouter (`anthropic/claude-sonnet-4.5`) — проверено на живых заявках в проде, категории/приоритеты/уверенность приходят корректно
+- Keyword-fallback (регексп по ключевым словам → 8 категорий) остаётся как запасной механизм — включается через `USE_MOCK_CLASSIFIER=true` или срабатывает автоматически при отсутствии `OPENROUTER_API_KEY`
 - Классификатор мигрирован с прямого Anthropic Messages API (`@anthropic-ai/sdk`) на OpenRouter (`OPENROUTER_API_KEY`, OpenAI-совместимый `/chat/completions`) — зависимость `@anthropic-ai/sdk` удалена из `package.json`
 
 ### Редизайн веб-дашборда (стиль A101) — завершён ✅
@@ -55,7 +55,7 @@
 |-----------|--------|
 | Owner-бот (регистрация + заявки) | ✅ Работает |
 | Contractor-бот (кнопки + фото) | ✅ Работает |
-| AI-классификация (keyword mock) | ✅ Работает |
+| AI-классификация (OpenRouter, Claude Sonnet 4.5) | ✅ Работает, keyword-fallback как запасной механизм |
 | Web-дашборд менеджера | ✅ Редизайн A101 завершён, готов к деплою |
 | Cron `/api/cron/overdue` | ✅ Задеплоен, запускается раз в день (Hobby plan) |
 | Storage (фото заявок) | ✅ Buckets созданы, приватные |
@@ -66,18 +66,21 @@
 ## Что предстоит
 
 ### Обязательно перед боевым запуском
-1. **Настоящий `OPENROUTER_API_KEY`** — получить платный ключ OpenRouter, прописать в Vercel, убрать/выключить `USE_MOCK_CLASSIFIER`
-2. **Удалить TODO-код mock-классификатора** — блок `isApiKeyPlaceholder()` + `KEYWORD_RULES` в `src/agents/handlers/classify-request.ts`
-3. **Создать менеджера** — Supabase Auth → создать пользователя, добавить строку в `manager_profiles`
-4. **Заполнить `apartment_contractors`** — привязать квартиры к подрядчикам по категориям (иначе заявки уходят в `requires_manual_review`)
-5. **Протестировать дашборд** — зайти под менеджером, проверить список заявок, фильтры, смену статуса, отчёты
+1. **Удалить TODO-код mock-классификатора** — блок `isApiKeyPlaceholder()` + `KEYWORD_RULES` в `src/agents/handlers/classify-request.ts`
+2. **Создать менеджера** — Supabase Auth → создать пользователя, добавить строку в `manager_profiles`
+3. **Заполнить `apartment_contractors`** — привязать квартиры к подрядчикам по категориям (иначе заявки уходят в `requires_manual_review`)
+4. **Протестировать дашборд** — зайти под менеджером, проверить список заявок, фильтры, смену статуса, отчёты
+
+### Известные пробелы
+- **`dispatchRequest` не отправляет карточку заявки в Telegram-канал подрядчика при создании заявки через API-роут** (`POST /api/requests`, `POST /api/requests/[id]/reclassify`) — уведомление подрядчику уходит только при создании заявки через Telegram-бота владельцев (`owner-handler.ts`). Требует доработки.
+- **Нет подрядчика для категории `windows_doors`** («Окна/двери») — такие заявки корректно уходят в `requires_manual_review` (graceful degradation сработала), но нужен подрядчик, привязанный к этой категории в `apartment_contractors`.
 
 ### После Vercel Pro
-6. **Вернуть cron на почасовой** — `vercel.json`: `0 9 * * *` → `0 * * * *` (см. `CRON_NOTES.md`)
+5. **Вернуть cron на почасовой** — `vercel.json`: `0 9 * * *` → `0 * * * *` (см. `CRON_NOTES.md`)
 
 ### Улучшения (опционально)
-7. Уведомления владельцу при смене статуса заявки (`accepted`, `completed`)
-8. Удаление диагностических console.log в `classify-request.ts` вернуть после реального AI (сейчас уже убраны)
+6. Уведомления владельцу при смене статуса заявки (`accepted`, `completed`)
+7. Удаление диагностических console.log в `classify-request.ts` вернуть после реального AI (сейчас уже убраны)
 
 ---
 
