@@ -289,6 +289,12 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://fixflow.vercel.app
 
 ## Development Guidelines
 
+### Serverless background work (Vercel)
+
+Any work that must happen after an API route sends its response — AI classification, dispatch, notifications — must go through **`after()` from `next/server`**, or be `await`-ed before `return NextResponse.json(...)`. Fire-and-forget (`fn().catch(...)` with no `await` before the response) is **forbidden**: Vercel is free to freeze the serverless function as soon as the response is sent, and anything still pending gets silently killed — no error, no log, just lost work.
+
+This is not theoretical — it happened. Commit `e4e2066` fixes a real production bug where `POST /api/requests` and `POST /api/requests/[id]/reclassify` kicked off AI classification with `.catch(console.error)` and returned immediately. The classification itself often completed (and got logged to `ai_classification_log`), but the follow-up write to `requests` (category, priority, contractor dispatch) was frozen mid-flight — requests got stuck in `ai_processing` forever, with no error anywhere. It was a floating bug: roughly 2 out of 3 requests were lost this way before the fix.
+
 ### Do
 
 - Use `src/lib/supabase/server.ts` for all server-side DB access
@@ -297,6 +303,7 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://fixflow.vercel.app
 - Return consistent error shapes: `{ error: { code, message, details? } }`
 - Log AI calls to `ai_classification_log` table on every invocation
 - Use `request_status_history` trigger-or-insert for every status change
+- Run post-response background work through `after()` from `next/server` (see Serverless background work above)
 
 ### Don't
 
@@ -306,6 +313,7 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://fixflow.vercel.app
 - Don't store secrets in code, comments, or git history
 - Don't add holiday-awareness to deadline calculation (not in MVP scope)
 - Don't add analytics beyond what's specified in SPEC Block 4
+- Don't fire-and-forget background work in API routes (`fn().catch(...)` without `await` before the response) — Vercel can freeze the function and lose the work silently (see Serverless background work above)
 
 ### Code style
 
