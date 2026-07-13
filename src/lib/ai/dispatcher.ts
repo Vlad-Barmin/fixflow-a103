@@ -170,6 +170,54 @@ export async function dispatchRequest(
   }
 }
 
+/**
+ * Помечает заявку как требующую ручной проверки, когда AI-классификация
+ * целиком не удалась (дневной лимит, исчерпаны retry, неожиданное исключение) —
+ * в отличие от markManualReview здесь нет ClassificationResult для сохранения.
+ *
+ * Вызывается из background-обработчиков (`after()` в API-роутах) как fallback,
+ * чтобы заявка никогда не оставалась вечно висеть в ai_processing без следа.
+ */
+export async function markClassificationFailed(
+  requestId: string,
+  reason: string
+): Promise<void> {
+  const supabase = createServiceRoleClient()
+
+  const { data: currentRequest } = (await supabase
+    .from('requests')
+    .select('status')
+    .eq('id', requestId)
+    .maybeSingle()) as {
+    data: Pick<RequestStatusRow, 'status'> | null
+    error: PostgrestError | null
+  }
+
+  const update = {
+    status: 'requires_manual_review' as const,
+    requires_manual_review: true,
+  } satisfies RequestUpdate
+  const { error } = await supabase
+    .from('requests')
+    .update(update as unknown as never)
+    .eq('id', requestId)
+
+  if (error) {
+    console.error(
+      '[dispatcher] Failed to mark request manual review after classification failure:',
+      error
+    )
+    return
+  }
+
+  await insertStatusHistory(supabase, {
+    request_id: requestId,
+    old_status: currentRequest?.status ?? null,
+    new_status: 'requires_manual_review',
+    reason,
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Внутренние помощники
 // ---------------------------------------------------------------------------

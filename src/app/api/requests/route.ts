@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import type { PostgrestError } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { requireAuth, isAuthError } from '@/lib/auth'
 import { classifyRequest, calculateDeadline } from '@/lib/ai/classifier'
-import { dispatchRequest } from '@/lib/ai/dispatcher'
+import { dispatchRequest, markClassificationFailed } from '@/lib/ai/dispatcher'
 import {
   REQUEST_STATUSES,
   REQUEST_PRIORITIES,
@@ -206,11 +206,17 @@ export async function POST(req: NextRequest) {
     .from('request_status_history')
     .insert(historyRecord as unknown as never)
 
-  // Запустить AI-классификацию асинхронно
-  runClassificationFlow(created.id, parsed.data.apartment_id).catch(
-    (err: unknown) =>
+  // Запустить AI-классификацию после отправки ответа. after() гарантирует,
+  // что Vercel не заморозит функцию до завершения фоновой работы —
+  // обычный fire-and-forget (.catch() без await) такой гарантии не даёт и
+  // приводил к тому, что заявка навсегда зависала в ai_processing.
+  after(async () => {
+    try {
+      await runClassificationFlow(created.id, parsed.data.apartment_id)
+    } catch (err) {
       console.error('[POST /api/requests] classification flow error:', err)
-  )
+    }
+  })
 
   return NextResponse.json(created, { status: 201 })
 }
@@ -231,54 +237,68 @@ async function runClassificationFlow(
     .update({ status: 'ai_processing' } as unknown as never)
     .eq('id', requestId)
 
-  // Получить данные для классификации
-  const { data: requestData } = (await supabase
-    .from('requests')
-    .select('description, apartments(building, number, residential_complexes(name))')
-    .eq('id', requestId)
-    .maybeSingle()) as {
-    data: {
-      description: string
-      apartments: {
-        building: string
-        number: string
-        residential_complexes: { name: string } | null
+  try {
+    // Получить данные для классификации
+    const { data: requestData } = (await supabase
+      .from('requests')
+      .select('description, apartments(building, number, residential_complexes(name))')
+      .eq('id', requestId)
+      .maybeSingle()) as {
+      data: {
+        description: string
+        apartments: {
+          building: string
+          number: string
+          residential_complexes: { name: string } | null
+        } | null
       } | null
-    } | null
-    error: PostgrestError | null
+      error: PostgrestError | null
+    }
+
+    if (!requestData || !requestData.apartments) {
+      console.error('[runClassificationFlow] Failed to load request data')
+      await markClassificationFailed(
+        requestId,
+        'Failed to load request data for classification'
+      )
+      return
+    }
+
+    const { data: photos } = (await supabase
+      .from('request_photos')
+      .select('storage_path')
+      .eq('request_id', requestId)) as {
+      data: { storage_path: string }[] | null
+      error: PostgrestError | null
+    }
+
+    const complexName =
+      requestData.apartments.residential_complexes?.name ?? 'Неизвестный ЖК'
+
+    const output = await classifyRequest({
+      requestId,
+      description: requestData.description,
+      complexName,
+      building: requestData.apartments.building,
+      apartmentNumber: requestData.apartments.number,
+      photoBase64: [],
+    })
+
+    if (!output.success) {
+      // AI не смог классифицировать (лимит, retry исчерпаны) — на ручную проверку
+      await markClassificationFailed(requestId, output.error)
+      return
+    }
+
+    await dispatchRequest(requestId, output.result, apartmentId)
+  } catch (err) {
+    // Любое неожиданное исключение — заявка не должна зависнуть молча
+    console.error('[runClassificationFlow] unexpected error:', err)
+    await markClassificationFailed(
+      requestId,
+      err instanceof Error ? err.message : String(err)
+    )
   }
-
-  if (!requestData || !requestData.apartments) {
-    console.error('[runClassificationFlow] Failed to load request data')
-    return
-  }
-
-  const { data: photos } = (await supabase
-    .from('request_photos')
-    .select('storage_path')
-    .eq('request_id', requestId)) as {
-    data: { storage_path: string }[] | null
-    error: PostgrestError | null
-  }
-
-  const complexName =
-    requestData.apartments.residential_complexes?.name ?? 'Неизвестный ЖК'
-
-  const output = await classifyRequest({
-    requestId,
-    description: requestData.description,
-    complexName,
-    building: requestData.apartments.building,
-    apartmentNumber: requestData.apartments.number,
-    photoBase64: [],
-  })
-
-  if (!output.success) {
-    // Dispatcher уже пометит как requires_manual_review через classifyRequest
-    return
-  }
-
-  await dispatchRequest(requestId, output.result, apartmentId)
 }
 
 export const dynamic = 'force-dynamic'
