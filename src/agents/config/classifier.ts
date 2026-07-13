@@ -1,11 +1,12 @@
 /**
  * Конфигурация AI-классификатора заявок FixFlow A103.
  *
- * Используется Anthropic Messages API (@anthropic-ai/sdk), НЕ Agent SDK —
- * задача одиночная (структурированный JSON-вывод), не многошаговая.
+ * Используется OpenRouter (OpenAI-совместимый /chat/completions), модель —
+ * Claude Sonnet 4.5 через провайдера anthropic/claude-sonnet-4.5. Задача
+ * одиночная (структурированный JSON-вывод), не многошаговая.
  */
 export const CLASSIFIER_CONFIG = {
-  model: 'claude-sonnet-4-5' as const,
+  model: 'anthropic/claude-sonnet-4.5' as const,
   /** Максимум токенов вывода — достаточно для короткого JSON */
   max_tokens: 256,
   /** temperature: 0 — детерминированный вывод для классификации */
@@ -13,7 +14,10 @@ export const CLASSIFIER_CONFIG = {
 }
 
 // ---------------------------------------------------------------------------
-// Стоимость токенов claude-sonnet-4-5 (USD за миллион токенов)
+// Стоимость токенов claude-sonnet-4.5 через OpenRouter (USD за миллион токенов)
+// Prompt caching Anthropic (cache_control) в OpenAI-совместимом формате
+// OpenRouter недоступен, поэтому cache-read токены больше не тарифицируются
+// отдельно — calculateCostUsd всегда получает cacheReadTokens = 0.
 // ---------------------------------------------------------------------------
 
 export const INPUT_COST_PER_M = 3.0

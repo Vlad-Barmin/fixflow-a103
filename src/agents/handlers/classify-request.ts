@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { PostgrestError } from '@supabase/supabase-js'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 import type { Database } from '@/types/database.types'
@@ -20,24 +19,18 @@ import type {
   ClassificationResult,
 } from '../types'
 
-/**
- * Один Anthropic-клиент на серверный инстанс. API-ключ читается из process.env
- * лениво — клиент не создаётся до первого вызова, чтобы избежать падения
- * на этапе билда.
- */
-let _anthropic: Anthropic | null = null
-function getAnthropic(): Anthropic {
-  if (_anthropic) return _anthropic
-  const apiKey = process.env.ANTHROPIC_API_KEY
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+
+function getOpenRouterApiKey(): string {
+  const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not set')
+    throw new Error('OPENROUTER_API_KEY is not set')
   }
-  _anthropic = new Anthropic({ apiKey })
-  return _anthropic
+  return apiKey
 }
 
 /**
- * Поддерживаемые MIME-типы изображений Anthropic Messages API.
+ * Поддерживаемые MIME-типы изображений в data-URI для image_url.
  */
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
 
@@ -61,7 +54,7 @@ function detectImageMediaType(base64: string): ImageMediaType {
  *
  * Поток:
  *   1. Проверить дневной лимит из app_settings.ai_daily_limit (default 200).
- *   2. Вызвать Claude (claude-sonnet-4-5) с prompt caching на системном промпте.
+ *   2. Вызвать Claude Sonnet 4.5 через OpenRouter (OpenAI-совместимый /chat/completions).
  *   3. Распарсить и валидировать JSON.
  *   4. Логировать каждый вызов (успешный или нет) в ai_classification_log.
  *   5. На ошибки (таймаут, невалидный JSON, 5xx) — retry: 5с → 30с.
@@ -71,7 +64,7 @@ function detectImageMediaType(base64: string): ImageMediaType {
  */
 // ---------------------------------------------------------------------------
 // Keyword-based fallback classifier (no API key needed)
-// TODO: удалить этот блок когда будет настоящий ANTHROPIC_API_KEY
+// TODO: удалить этот блок когда будет настоящий OPENROUTER_API_KEY
 // ---------------------------------------------------------------------------
 
 type KeywordRule = { patterns: RegExp; category: ClassificationResult['category'] }
@@ -97,7 +90,7 @@ function isApiKeyPlaceholder(): boolean {
   // Явный выключатель — USE_MOCK_CLASSIFIER=true в Vercel env vars
   if (process.env.USE_MOCK_CLASSIFIER === 'true') return true
   // Запасная проверка: ключ не задан
-  if (!process.env.ANTHROPIC_API_KEY) return true
+  if (!process.env.OPENROUTER_API_KEY) return true
   return false
 }
 
@@ -114,7 +107,7 @@ export async function classifyRequest(
       category,
       priority: 'normal',
       confidence: 0.9,
-      reasoning: `[MOCK] Keyword-based fallback, no valid ANTHROPIC_API_KEY. Matched: ${category}`,
+      reasoning: `[MOCK] Keyword-based fallback, no valid OPENROUTER_API_KEY. Matched: ${category}`,
     }
     return { success: true, result }
   }
@@ -168,7 +161,7 @@ export async function classifyRequest(
 
     const startedAt = Date.now()
     try {
-      const result = await invokeClaude(input)
+      const result = await invokeOpenRouter(input)
       const latencyMs = Date.now() - startedAt
 
       await logClassification(supabase, {
@@ -220,83 +213,86 @@ interface InvokeResult {
   usage: {
     input_tokens: number
     output_tokens: number
-    cache_read_input_tokens: number
-    cache_creation_input_tokens: number
   }
   cost_usd: number
 }
 
-async function invokeClaude(input: ClassificationInput): Promise<InvokeResult> {
-  const anthropic = getAnthropic()
+/**
+ * OpenAI-совместимые типы контента для /chat/completions (подмножество,
+ * достаточное для текста + изображений через image_url).
+ */
+type OpenRouterContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
+interface OpenRouterResponse {
+  choices?: Array<{ message?: { content?: string | null } }>
+  usage?: { prompt_tokens?: number; completion_tokens?: number }
+  error?: { message?: string }
+}
+
+async function invokeOpenRouter(input: ClassificationInput): Promise<InvokeResult> {
+  const apiKey = getOpenRouterApiKey()
 
   // Сборка контента: текст + опционально изображения
-  const userContent: Array<Anthropic.Messages.TextBlockParam | Anthropic.Messages.ImageBlockParam> = [
+  const userContent: OpenRouterContentPart[] = [
     { type: 'text', text: buildUserPrompt(input) },
   ]
 
   if (input.photoBase64 && input.photoBase64.length > 0) {
     for (const data of input.photoBase64) {
       userContent.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: detectImageMediaType(data),
-          data,
-        },
+        type: 'image_url',
+        image_url: { url: `data:${detectImageMediaType(data)};base64,${data}` },
       })
     }
   }
 
-  // Используем beta.promptCaching для поддержки cache_control на системных блоках.
-  // Это экономит до 90% токенов на повторных вызовах за счёт кэширования системного промпта.
-  const response = await anthropic.beta.promptCaching.messages.create({
-    model: CLASSIFIER_CONFIG.model,
-    max_tokens: CLASSIFIER_CONFIG.max_tokens,
-    temperature: CLASSIFIER_CONFIG.temperature,
-    system: [
-      {
-        type: 'text',
-        text: CLASSIFIER_SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: userContent,
-      },
-    ],
+  // Prompt caching в формате Anthropic (cache_control) здесь не применяется —
+  // OpenRouter в OpenAI-совместимом режиме его не поддерживает.
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: CLASSIFIER_CONFIG.model,
+      max_tokens: CLASSIFIER_CONFIG.max_tokens,
+      temperature: CLASSIFIER_CONFIG.temperature,
+      messages: [
+        { role: 'system', content: CLASSIFIER_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+    }),
   })
 
-  // Извлекаем текстовый блок ответа
-  const textBlock = response.content.find(
-    (c): c is Anthropic.TextBlock => c.type === 'text'
-  )
-  if (!textBlock) {
-    throw new Error('Claude response contains no text block')
+  const payload = (await response.json()) as OpenRouterResponse
+
+  if (!response.ok) {
+    throw new Error(
+      `OpenRouter request failed (${response.status}): ${
+        payload.error?.message ?? response.statusText
+      }`
+    )
   }
 
-  const classification = parseClassificationResponse(textBlock.text)
+  const content = payload.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error('OpenRouter response contains no message content')
+  }
 
-  const usage = response.usage
-  const cacheRead = (usage as { cache_read_input_tokens?: number | null })
-    .cache_read_input_tokens ?? 0
-  const cacheCreation =
-    (usage as { cache_creation_input_tokens?: number | null })
-      .cache_creation_input_tokens ?? 0
-  const cost_usd = calculateCostUsd(
-    usage.input_tokens,
-    usage.output_tokens,
-    cacheRead
-  )
+  const classification = parseClassificationResponse(content)
+
+  const inputTokens = payload.usage?.prompt_tokens ?? 0
+  const outputTokens = payload.usage?.completion_tokens ?? 0
+  const cost_usd = calculateCostUsd(inputTokens, outputTokens)
 
   return {
     classification,
     usage: {
-      input_tokens: usage.input_tokens,
-      output_tokens: usage.output_tokens,
-      cache_read_input_tokens: cacheRead,
-      cache_creation_input_tokens: cacheCreation,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
     },
     cost_usd,
   }

@@ -1,17 +1,17 @@
 ---
-description: Правила для AI-агентов FixFlow A103 (Anthropic Messages API, классификатор заявок)
+description: Правила для AI-агентов FixFlow A103 (OpenRouter, классификатор заявок)
 globs: ["src/agents/**", "src/lib/ai/**", "src/app/api/requests/*/reclassify/**"]
 ---
 
 ## Модель и SDK
 
 ```typescript
-// Используем Anthropic Messages API (@anthropic-ai/sdk)
+// Используем OpenRouter (OpenAI-совместимый /chat/completions через fetch)
 // НЕ Agent SDK — задача одиночная (классификация), не многошаговая
-import Anthropic from '@anthropic-ai/sdk'
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
 // Модель по умолчанию
-const MODEL = 'claude-sonnet-4-5'
+const MODEL = 'anthropic/claude-sonnet-4.5'
 
 // Параметры классификатора
 const CLASSIFIER_CONFIG = {
@@ -23,19 +23,15 @@ const CLASSIFIER_CONFIG = {
 
 ## API Key
 
-- `ANTHROPIC_API_KEY` только в `.env.local`, только server-side
+- `OPENROUTER_API_KEY` только в `.env.local`, только server-side
 - Никогда в client components, никогда в NEXT_PUBLIC_ переменных
 - Никогда в коде или комментариях
 
 ## Prompt Caching
 
 ```typescript
-// Системный промпт — включить cache_control для экономии до 90%
-system: [{
-  type: 'text',
-  text: CLASSIFIER_SYSTEM_PROMPT,
-  cache_control: { type: 'ephemeral' },
-}]
+// OpenRouter в OpenAI-совместимом режиме не поддерживает Anthropic
+// cache_control — системный промпт кэширование не применяется
 ```
 
 ## Логирование
@@ -98,14 +94,12 @@ if (result.confidence < CONFIDENCE_THRESHOLD) {
 ## Стоимость
 
 ```typescript
-// claude-sonnet-4-5
+// anthropic/claude-sonnet-4.5 через OpenRouter
 INPUT_COST_PER_M  = 3.00   // $/M tokens
 OUTPUT_COST_PER_M = 15.00  // $/M tokens
-CACHE_READ_PER_M  = 0.30   // $/M cached tokens
 
-// Типичный запрос с промптом caching:
+// Типичный запрос (без prompt caching — OpenRouter его не поддерживает):
 // Input: ~800 tokens = $0.0024
-// Cache read: ~600 tokens (system prompt) = $0.00018
 // Output: ~100 tokens = $0.0015
 // Итого: ~$0.004 за классификацию
 ```

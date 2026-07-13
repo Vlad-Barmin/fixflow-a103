@@ -8,7 +8,7 @@ globs: ["src/**", "supabase/**"]
 ```
 ❌ НИКОГДА не помещать в client-side код:
    - SUPABASE_SERVICE_ROLE_KEY
-   - ANTHROPIC_API_KEY
+   - OPENROUTER_API_KEY
    - TELEGRAM_BOT_TOKEN
    - TELEGRAM_BOT_SECRET
    - TELEGRAM_CONTRACTOR_BOT_TOKEN

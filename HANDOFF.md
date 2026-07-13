@@ -25,9 +25,10 @@
 | 5 | `//` комментарий в `vercel.json` ломал парсер | `vercel.json` | Убрали, заметку перенесли в `CRON_NOTES.md` |
 
 ### AI-классификатор
-- Код Claude Sonnet (`claude-sonnet-4-5`) написан и задеплоен, но не активен
+- Код Claude Sonnet 4.5 через OpenRouter (`anthropic/claude-sonnet-4.5`) написан и задеплоен, но не активен
 - Активен keyword-fallback: регексп по ключевым словам → 8 категорий
 - Режим включается через `USE_MOCK_CLASSIFIER=true` в Vercel env vars
+- Классификатор мигрирован с прямого Anthropic Messages API (`@anthropic-ai/sdk`) на OpenRouter (`OPENROUTER_API_KEY`, OpenAI-совместимый `/chat/completions`) — зависимость `@anthropic-ai/sdk` удалена из `package.json`
 
 ### Редизайн веб-дашборда (стиль A101) — завершён ✅
 Выполнены все 9 шагов. Проверено на localhost, production-сборка (`npm run build`) прошла чисто.
@@ -65,7 +66,7 @@
 ## Что предстоит
 
 ### Обязательно перед боевым запуском
-1. **Настоящий `ANTHROPIC_API_KEY`** — получить платный ключ Anthropic, прописать в Vercel, убрать/выключить `USE_MOCK_CLASSIFIER`
+1. **Настоящий `OPENROUTER_API_KEY`** — получить платный ключ OpenRouter, прописать в Vercel, убрать/выключить `USE_MOCK_CLASSIFIER`
 2. **Удалить TODO-код mock-классификатора** — блок `isApiKeyPlaceholder()` + `KEYWORD_RULES` в `src/agents/handlers/classify-request.ts`
 3. **Создать менеджера** — Supabase Auth → создать пользователя, добавить строку в `manager_profiles`
 4. **Заполнить `apartment_contractors`** — привязать квартиры к подрядчикам по категориям (иначе заявки уходят в `requires_manual_review`)

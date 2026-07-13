@@ -55,12 +55,11 @@ if (secret !== process.env.TELEGRAM_BOT_SECRET) {
 
 ## Чеклист: AI-компонент
 
-- [ ] Каждый вызов Anthropic API логируется в `ai_classification_log`
+- [ ] Каждый вызов OpenRouter API логируется в `ai_classification_log`
 - [ ] Проверка дневного лимита (200 вызовов) перед вызовом API
 - [ ] Retry-логика: 5с → 30с → fallback на requires_manual_review
 - [ ] `confidence < 0.5` → `requires_manual_review = true`
-- [ ] `ANTHROPIC_API_KEY` только в server-side коде
-- [ ] Prompt caching включён (cache_control в system prompt)
+- [ ] `OPENROUTER_API_KEY` только в server-side коде
 
 ## Чеклист: 152-ФЗ (персональные данные)
 
@@ -128,6 +127,6 @@ grep -rn "'use client'" src/app/ --include="*.tsx"
 
 # Проверить что нет секретов в коде
 grep -rn "NEXT_PUBLIC_SUPABASE_SERVICE" src/
-grep -rn "sk-ant-" src/
+grep -rn "sk-or-" src/
 grep -rn "bot:" src/ --include="*.ts"
 ```

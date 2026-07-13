@@ -26,7 +26,7 @@ Stack is **fixed** — no alternatives, no substitutions.
 | UI Components | shadcn/ui | latest |
 | Database | Supabase PostgreSQL | 15+ |
 | Auth | Supabase Auth | — |
-| AI | Anthropic Claude Sonnet | claude-sonnet-4-5 |
+| AI | Claude Sonnet 4.5 via OpenRouter | anthropic/claude-sonnet-4.5 |
 | Messaging | Telegram Bot API | 7.x |
 | Deployment | Vercel | — |
 
@@ -166,7 +166,7 @@ new → ai_processing → routed → accepted → in_progress → completed
 ## AI Classification Agent
 
 **Location**: `src/agents/`  
-**Model**: `claude-sonnet-4-5` via Anthropic Messages API (not Agent SDK)  
+**Model**: `anthropic/claude-sonnet-4.5` via OpenRouter (OpenAI-совместимый `/chat/completions`, not Agent SDK)  
 **Cost**: ~$0.006 per classification | **Rate limit**: 200/day
 
 ### Flow
@@ -251,8 +251,8 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=          # Server-side only — never expose to client
 
-# Anthropic
-ANTHROPIC_API_KEY=
+# OpenRouter (AI classification — Claude Sonnet 4.5 via anthropic/claude-sonnet-4.5)
+OPENROUTER_API_KEY=
 
 # Telegram — Owner Bot
 TELEGRAM_BOT_TOKEN=
@@ -301,7 +301,7 @@ NEXT_PUBLIC_APP_URL=                # e.g. https://fixflow.vercel.app
 ### Don't
 
 - Don't create new DB access patterns outside `src/lib/supabase/`
-- Don't call Anthropic API directly from frontend — always via server route
+- Don't call OpenRouter API directly from frontend — always via server route
 - Don't skip RLS — use service_role only when anon/user key is insufficient
 - Don't store secrets in code, comments, or git history
 - Don't add holiday-awareness to deadline calculation (not in MVP scope)
