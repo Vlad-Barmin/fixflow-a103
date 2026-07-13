@@ -211,7 +211,11 @@ USE_MOCK_CLASSIFIER=true
 
 ### 3. Применить миграции базы данных
 
-Открыть Supabase → SQL Editor → выполнить файл `MIGRATIONS_ALL.sql` целиком.
+```bash
+npm run supabase:migrate   # supabase db push — применяет все файлы из supabase/migrations/
+```
+
+Либо вручную: Supabase → SQL Editor → выполнить файлы из `supabase/migrations/` по порядку (по имени, они пронумерованы).
 
 ### 4. Создать аккаунт менеджера
 

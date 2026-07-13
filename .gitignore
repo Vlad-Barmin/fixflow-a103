@@ -58,6 +58,14 @@ desktop.ini
 # Claude Code — personal overrides (не для команды)
 .claude/settings.local.json
 
+# Внутренние/учебные файлы — остаются на диске, не публикуются
+claude-code-setup-generator.md
+ASSEMBLY_PROMPT.md
+subagent-architecture-guide.md
+HANDOFF.md
+CRON_NOTES.md
+MIGRATIONS_ALL.sql
+
 # Editor
 .vscode/
 .idea/
