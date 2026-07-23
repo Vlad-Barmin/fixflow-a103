@@ -109,6 +109,13 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
   const currentState = (stateRow?.state ?? null) as BotState | null
   const stateData = (stateRow?.data ?? {}) as RegistrationData
 
+  // Команда /help отвечает справкой независимо от состояния и не меняет
+  // текущий сценарий (ни регистрацию, ни ожидание заявки).
+  if (message?.text?.trim() === '/help') {
+    await sendHelpMessage(chatId)
+    return
+  }
+
   // Команда /start всегда сбрасывает к началу регистрации
   if (message?.text === '/start' || currentState === null) {
     await upsertState(supabase, chatId, 'awaiting_consent', {})
@@ -131,7 +138,8 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
 
   // Обработка текстовых сообщений
   if (message) {
-    await handleTextMessage(supabase, chatId, message.text ?? '', currentState, stateData)
+    const hasPhoto = Boolean(message.photo && message.photo.length > 0)
+    await handleTextMessage(supabase, chatId, message.text ?? '', currentState, stateData, hasPhoto)
     return
   }
 }
@@ -208,7 +216,8 @@ async function handleTextMessage(
   chatId: number,
   text: string,
   state: BotState | null,
-  stateData: RegistrationData
+  stateData: RegistrationData,
+  hasPhoto: boolean
 ): Promise<void> {
   switch (state) {
     case 'awaiting_name': {
@@ -276,7 +285,7 @@ async function handleTextMessage(
 
     case 'registered': {
       // Владелец отправляет заявку — создаём request и запускаем AI
-      await handleNewRequest(supabase, chatId, text)
+      await handleNewRequest(supabase, chatId, text, hasPhoto)
       return
     }
 
@@ -389,15 +398,20 @@ async function handleApartmentRegistration(
 // Создание заявки от зарегистрированного владельца
 // ---------------------------------------------------------------------------
 
+/** Минимальная длина описания проблемы, ниже которой заявка не создаётся без фото */
+const MIN_DESCRIPTION_LENGTH = 15
+
 async function handleNewRequest(
   supabase: ReturnType<typeof createServiceRoleClient>,
   chatId: number,
-  description: string
+  description: string,
+  hasPhoto: boolean
 ): Promise<void> {
-  if (description.trim().length < 10) {
+  if (description.trim().length < MIN_DESCRIPTION_LENGTH && !hasPhoto) {
     await sendOwnerMessage(
       chatId,
-      'Пожалуйста, опишите проблему подробнее (не менее 10 символов).'
+      'Опишите проблему подробнее — что именно случилось и где. ' +
+        'Например: «В ванной подтекает труба под раковиной». Можно приложить фото.'
     )
     return
   }
@@ -761,6 +775,23 @@ async function sendComplexSelection(
   }
 
   await sendOwnerMessage(chatId, 'Выберите ваш жилой комплекс:', keyboard)
+}
+
+// ---------------------------------------------------------------------------
+// Справка по команде /help
+// ---------------------------------------------------------------------------
+
+async function sendHelpMessage(chatId: number): Promise<void> {
+  await sendOwnerMessage(
+    chatId,
+    'ℹ️ Как подать заявку на гарантийный ремонт:\n\n' +
+      '1. Опишите проблему текстом — например: «На кухне не работает розетка ' +
+      'у плиты». Можно приложить фото.\n' +
+      '2. Мы автоматически определим категорию и приоритет и передадим заявку ' +
+      'нужному подрядчику.\n' +
+      '3. Как только статус заявки изменится, вы получите уведомление прямо в этот чат.\n\n' +
+      'Начать регистрацию заново — /start.'
+  )
 }
 
 // ---------------------------------------------------------------------------
