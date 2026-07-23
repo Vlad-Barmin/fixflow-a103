@@ -86,6 +86,18 @@ function keywordClassify(description: string): ClassificationResult['category'] 
   return 'other'
 }
 
+/**
+ * Грубая эвристика "это вообще про бытовую проблему?" для mock-режима —
+ * без реального AI-вызова нет смысла в отдельном is_request-анализе, но
+ * оставлять его недетектируемым (всегда true) обесценило бы фильтр в dev-режиме.
+ */
+const GENERIC_PROBLEM_PATTERN = /слома|не работа|не включа|проблем|неисправ|повреж|дефект/i
+
+function keywordIsRequest(description: string): boolean {
+  if (KEYWORD_RULES.some((rule) => rule.patterns.test(description))) return true
+  return GENERIC_PROBLEM_PATTERN.test(description)
+}
+
 function isApiKeyPlaceholder(): boolean {
   // Явный выключатель — USE_MOCK_CLASSIFIER=true в Vercel env vars
   if (process.env.USE_MOCK_CLASSIFIER === 'true') return true
@@ -102,12 +114,16 @@ export async function classifyRequest(
   // TODO: убрать этот блок после настройки настоящего ANTHROPIC_API_KEY
   // -------------------------------------------------------------------------
   if (isApiKeyPlaceholder()) {
+    const isRequest = keywordIsRequest(input.description)
     const category = keywordClassify(input.description)
     const result: ClassificationResult = {
+      is_request: isRequest,
       category,
       priority: 'normal',
       confidence: 0.9,
-      reasoning: `[MOCK] Keyword-based fallback, no valid OPENROUTER_API_KEY. Matched: ${category}`,
+      reasoning: isRequest
+        ? `[MOCK] Keyword-based fallback, no valid OPENROUTER_API_KEY. Matched: ${category}`
+        : '[MOCK] No household-problem keywords matched — treated as non-request text.',
     }
     return { success: true, result }
   }

@@ -14,7 +14,8 @@
 
 import type { PostgrestError } from '@supabase/supabase-js'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
-import { calculateDeadline } from '@/lib/ai/classifier'
+import { calculateDeadline, classifyRequest } from '@/lib/ai/classifier'
+import type { ClassificationOutput } from '@/lib/ai/classifier'
 import type { Json, Database } from '@/types/database.types'
 import {
   sendOwnerMessage,
@@ -116,7 +117,16 @@ export async function handleOwnerUpdate(update: TelegramUpdate): Promise<void> {
     return
   }
 
-  // Команда /start всегда сбрасывает к началу регистрации
+  // /start у уже зарегистрированного жильца НЕ сбрасывает регистрацию —
+  // иначе он теряет данные (owner_name/owner_phone перезаписываются) и
+  // плодит дубли в owner_consents при повторном прохождении анкеты.
+  if (message?.text === '/start' && currentState === 'registered') {
+    await sendAlreadyRegisteredMessage(supabase, chatId)
+    return
+  }
+
+  // Команда /start (для незавершённой/отсутствующей регистрации) всегда
+  // сбрасывает к началу регистрации
   if (message?.text === '/start' || currentState === null) {
     await upsertState(supabase, chatId, 'awaiting_consent', {})
     await sendConsentMessage(chatId)
@@ -219,6 +229,17 @@ async function handleTextMessage(
   stateData: RegistrationData,
   hasPhoto: boolean
 ): Promise<void> {
+  // /start и /help перехвачены раньше в handleOwnerUpdate и сюда не попадают.
+  // Любая другая команда (/cancel и т.п.) не должна записываться как ФИО,
+  // телефон, номер корпуса и т.д. — отвечаем подсказкой, не трогая state.
+  if (text.trim().startsWith('/')) {
+    await sendOwnerMessage(
+      chatId,
+      'Неизвестная команда. Введите текстовый ответ или отправьте /help для справки.'
+    )
+    return
+  }
+
   switch (state) {
     case 'awaiting_name': {
       const name = text.trim()
@@ -286,6 +307,15 @@ async function handleTextMessage(
     case 'registered': {
       // Владелец отправляет заявку — создаём request и запускаем AI
       await handleNewRequest(supabase, chatId, text, hasPhoto)
+      return
+    }
+
+    case 'awaiting_complex': {
+      // Ожидаем нажатие inline-кнопки (см. handleCallbackQuery), не текст.
+      // Не сбрасываем регистрацию — просто напоминаем про кнопки и
+      // сохраняем уже введённые ФИО/телефон (stateData не трогаем).
+      await sendOwnerMessage(chatId, 'Пожалуйста, выберите ваш ЖК с помощью кнопки ниже.')
+      await sendComplexSelection(supabase, chatId)
       return
     }
 
@@ -401,18 +431,21 @@ async function handleApartmentRegistration(
 /** Минимальная длина описания проблемы, ниже которой заявка не создаётся без фото */
 const MIN_DESCRIPTION_LENGTH = 15
 
+/** Подсказка для нерелевантного или слишком короткого сообщения */
+const NOT_A_PROBLEM_HINT =
+  'Опишите проблему подробнее — что именно случилось и где. ' +
+  'Например: «В ванной подтекает труба под раковиной».'
+
 async function handleNewRequest(
   supabase: ReturnType<typeof createServiceRoleClient>,
   chatId: number,
   description: string,
   hasPhoto: boolean
 ): Promise<void> {
-  if (description.trim().length < MIN_DESCRIPTION_LENGTH && !hasPhoto) {
-    await sendOwnerMessage(
-      chatId,
-      'Опишите проблему подробнее — что именно случилось и где. ' +
-        'Например: «В ванной подтекает труба под раковиной». Можно приложить фото.'
-    )
+  const trimmedDescription = description.trim()
+
+  if (trimmedDescription.length < MIN_DESCRIPTION_LENGTH && !hasPhoto) {
+    await sendOwnerMessage(chatId, `${NOT_A_PROBLEM_HINT} Можно приложить фото.`)
     return
   }
 
@@ -437,13 +470,38 @@ async function handleNewRequest(
     return
   }
 
+  const complexData = apartment.residential_complexes
+  const complexName = Array.isArray(complexData)
+    ? (complexData[0]?.name ?? '')
+    : (complexData?.name ?? '')
+
+  // Проверка релевантности ДО создания заявки: тот же классификатор, что
+  // используется для маршрутизации — переиспользуем его результат ниже,
+  // чтобы не делать второй AI-вызов на одну и ту же заявку.
+  // requestId: null — строка requests ещё не создана.
+  const classification = await classifyRequest({
+    requestId: null,
+    description: trimmedDescription,
+    complexName,
+    building: apartment.building,
+    apartmentNumber: apartment.number,
+  })
+
+  // Отклоняем только при уверенном "это не заявка". Если сам AI-вызов не
+  // удался (таймаут/лимит/ошибка) — не блокируем жильца, пропускаем дальше
+  // и полагаемся на существующий fallback (requires_manual_review).
+  if (classification.success && !classification.result.is_request) {
+    await sendOwnerMessage(chatId, NOT_A_PROBLEM_HINT)
+    return
+  }
+
   // Рассчитать дедлайн (5 рабочих дней, 18:00 МСК)
   const deadline = calculateDeadline(new Date())
 
   // Создать заявку
   const requestInsert = {
     apartment_id: apartment.id,
-    description: description.trim(),
+    description: trimmedDescription,
     status: 'new' as const,
     priority: 'normal' as const,
     deadline: deadline.toISOString(),
@@ -476,9 +534,10 @@ async function handleNewRequest(
   )
 
   // AI-классификация синхронно — Vercel serverless убивает fire-and-forget
-  // после отправки HTTP-ответа, поэтому await обязателен
+  // после отправки HTTP-ответа, поэтому await обязателен.
+  // Передаём уже вычисленный classification — второй AI-вызов не нужен.
   try {
-    await triggerAiClassification(supabase, request.id, apartment)
+    await triggerAiClassification(supabase, request.id, apartment, classification)
   } catch (err) {
     console.error('AI classification error for request', request.id, err)
   }
@@ -499,12 +558,20 @@ interface ApartmentWithComplex {
     | null
 }
 
+/**
+ * Диспетчеризация заявки на основе результата AI-классификации, вычисленного
+ * ЗАРАНЕЕ — в handleNewRequest, ещё до создания строки requests (та же
+ * проверка заодно отсеивает нерелевантные сообщения). Повторный AI-вызов
+ * здесь не нужен — это было бы двойным расходом дневного лимита и бюджета
+ * на одну и ту же заявку.
+ */
 async function triggerAiClassification(
   supabase: ReturnType<typeof createServiceRoleClient>,
   requestId: string,
-  apartment: ApartmentWithComplex
+  apartment: ApartmentWithComplex,
+  output: ClassificationOutput
 ): Promise<void> {
-  // Обновить статус перед вызовом AI
+  // Обновить статус перед диспетчеризацией
   await supabase
     .from('requests')
     .update(({ status: 'ai_processing' } satisfies RequestUpdate) as unknown as never)
@@ -529,16 +596,6 @@ async function triggerAiClassification(
   const complexName = Array.isArray(complexData)
     ? (complexData[0]?.name ?? '')
     : (complexData?.name ?? '')
-
-  const { classifyRequest } = await import('@/lib/ai/classifier')
-
-  const output = await classifyRequest({
-    requestId,
-    description: requestRow.description,
-    complexName,
-    building: apartment.building,
-    apartmentNumber: apartment.number,
-  })
 
   if (!output.success) {
     // AI вернул ошибку → требуется ручная проверка
@@ -790,7 +847,36 @@ async function sendHelpMessage(chatId: number): Promise<void> {
       '2. Мы автоматически определим категорию и приоритет и передадим заявку ' +
       'нужному подрядчику.\n' +
       '3. Как только статус заявки изменится, вы получите уведомление прямо в этот чат.\n\n' +
-      'Начать регистрацию заново — /start.'
+      'Посмотреть статус регистрации — /start.'
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Краткое приветствие для уже зарегистрированного жильца по команде /start
+// ---------------------------------------------------------------------------
+
+async function sendAlreadyRegisteredMessage(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  chatId: number
+): Promise<void> {
+  const { data: apartment } = await supabase
+    .from('apartments')
+    .select('number, building')
+    .eq('owner_telegram_chat_id', chatId)
+    .maybeSingle() as {
+      data: Pick<ApartmentRow, 'number' | 'building'> | null
+      error: PostgrestError | null
+    }
+
+  const apartmentLine = apartment
+    ? `Квартира №${apartment.number}, корп. ${apartment.building}.\n\n`
+    : ''
+
+  await sendOwnerMessage(
+    chatId,
+    `Вы уже зарегистрированы!\n\n${apartmentLine}` +
+      'Опишите проблему, чтобы подать заявку на ремонт. ' +
+      'Справка — /help.'
   )
 }
 

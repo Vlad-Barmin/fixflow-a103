@@ -15,7 +15,6 @@ async function getKpiData() {
     supabase
       .from('requests')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'new')
       .gte('created_at', todayStart),
     supabase
       .from('requests')
@@ -85,7 +84,7 @@ async function KpiSection() {
       <KpiCard
         title="Новые сегодня"
         value={kpi.newToday}
-        description="Ожидают обработки"
+        description="Поступило заявок сегодня"
         icon={<ClipboardList className="h-4 w-4" />}
       />
       <KpiCard

@@ -7,7 +7,12 @@ import type { RequestCategory, RequestPriority } from '@/types'
  * Только описание проблемы и обезличенный адрес квартиры.
  */
 export interface ClassificationInput {
-  requestId: string
+  /**
+   * null — для предварительной проверки релевантности текста ДО создания
+   * строки в requests (заявки ещё не существует, писать в лог не к чему
+   * привязать; ai_classification_log.request_id допускает NULL).
+   */
+  requestId: string | null
   description: string
   complexName: string
   building: string
@@ -20,6 +25,12 @@ export interface ClassificationInput {
  * Структурированный результат классификации, полученный от Claude.
  */
 export interface ClassificationResult {
+  /**
+   * false — текст не описывает бытовую проблему/дефект в квартире (болтовня,
+   * приветствие, вопрос не по теме и т.п.). В этом случае category/priority —
+   * заполнители и не должны использоваться для создания или маршрутизации заявки.
+   */
+  is_request: boolean
   category: RequestCategory
   priority: RequestPriority
   /** Уверенность модели в диапазоне 0..1 */

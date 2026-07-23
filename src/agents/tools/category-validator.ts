@@ -27,6 +27,7 @@ const PRIORITIES = [
  * Zod-схема ответа классификатора. Любое отклонение → ZodError.
  */
 export const ClassificationResponseSchema = z.object({
+  is_request: z.boolean(),
   category: z.enum(CATEGORIES),
   priority: z.enum(PRIORITIES),
   confidence: z.number().min(0).max(1),
